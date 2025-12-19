@@ -141,11 +141,13 @@ func main() {
 	middleware.SetUpLogger(server)
 	// Initialize session store
 	store := cookie.NewStore([]byte(common.SessionSecret))
+	// 根据环境变量决定是否启用 Secure Cookie（生产环境应启用 HTTPS）
+	secureCookie := os.Getenv("SESSION_SECURE") == "true" || os.Getenv("HTTPS_ENABLED") == "true"
 	store.Options(sessions.Options{
 		Path:     "/",
 		MaxAge:   2592000, // 30 days
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   secureCookie,
 		SameSite: http.SameSiteStrictMode,
 	})
 	server.Use(sessions.Sessions("session", store))

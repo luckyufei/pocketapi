@@ -1,8 +1,7 @@
 package common
 
 import (
-	//"os"
-	//"strconv"
+	"os"
 	"sync"
 	"time"
 
@@ -31,8 +30,19 @@ var DefaultCollapseSidebar = false // default value of collapse sidebar
 
 // Any options with "Secret", "Token" in its key won't be return by GetOptions
 
-var SessionSecret = uuid.New().String()
-var CryptoSecret = uuid.New().String()
+// SessionSecret 和 CryptoSecret 优先从环境变量读取，确保服务重启后 session 不失效
+var SessionSecret = func() string {
+	if value := os.Getenv("SESSION_SECRET"); value != "" {
+		return value
+	}
+	return uuid.New().String()
+}()
+var CryptoSecret = func() string {
+	if value := os.Getenv("CRYPTO_SECRET"); value != "" {
+		return value
+	}
+	return uuid.New().String()
+}()
 
 var OptionMap map[string]string
 var OptionMapRWMutex sync.RWMutex
@@ -76,6 +86,7 @@ var LogConsumeEnabled = true
 var SMTPServer = ""
 var SMTPPort = 587
 var SMTPSSLEnabled = false
+var SMTPSkipVerify = false // TLS 证书验证跳过（仅用于自签名证书，生产环境应设为 false）
 var SMTPAccount = ""
 var SMTPFrom = ""
 var SMTPToken = ""

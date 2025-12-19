@@ -69,8 +69,15 @@ func createRootAccountIfNeed() error {
 	var user User
 	//if user.Status != common.UserStatusEnabled {
 	if err := DB.First(&user).Error; err != nil {
-		common.SysLog("no user exists, create a root user for you: username is root, password is 123456")
-		hashedPassword, err := common.Password2Hash("123456")
+		// 生成随机密码，提高安全性
+		randomPassword, err := common.GenerateRandomCharsKey(16)
+		if err != nil {
+			// 如果随机生成失败，使用 UUID 作为后备方案
+			randomPassword = common.GetUUID()[:16]
+		}
+		common.SysLog(fmt.Sprintf("no user exists, create a root user for you: username is root, password is %s", randomPassword))
+		common.SysLog("IMPORTANT: Please change the root password immediately after first login!")
+		hashedPassword, err := common.Password2Hash(randomPassword)
 		if err != nil {
 			return err
 		}

@@ -26,6 +26,12 @@ import (
 func OpenBrowser(url string) {
 	var err error
 
+	// 安全校验：只允许 http/https 协议，防止命令注入
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		log.Println("OpenBrowser: invalid URL scheme, only http/https allowed")
+		return
+	}
+
 	switch runtime.GOOS {
 	case "linux":
 		err = exec.Command("xdg-open", url).Start()
