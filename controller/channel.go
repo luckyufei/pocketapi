@@ -955,6 +955,52 @@ func UpdateChannel(c *gin.Context) {
 	return
 }
 
+// validateBaseURL checks if the provided URL is safe to access (防止 SSRF 攻击)
+func validateBaseURL(rawURL string) error {
+	if rawURL == "" {
+		return nil
+	}
+
+	parsed, err := common.ParseURL(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL format: %w", err)
+	}
+
+	// 只允许 http/https 协议
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("only http/https protocols are allowed")
+	}
+
+	host := parsed.Hostname()
+
+	// 禁止访问内网地址
+	forbiddenPatterns := []string{
+		"localhost",
+		"127.",
+		"10.",
+		"172.16.", "172.17.", "172.18.", "172.19.",
+		"172.20.", "172.21.", "172.22.", "172.23.",
+		"172.24.", "172.25.", "172.26.", "172.27.",
+		"172.28.", "172.29.", "172.30.", "172.31.",
+		"192.168.",
+		"169.254.", // AWS/云元数据地址
+		"0.",
+		"[::1]",
+		"[fc",
+		"[fd",
+		"[fe80",
+	}
+
+	hostLower := strings.ToLower(host)
+	for _, pattern := range forbiddenPatterns {
+		if strings.HasPrefix(hostLower, pattern) || hostLower == pattern {
+			return fmt.Errorf("access to internal network addresses is forbidden")
+		}
+	}
+
+	return nil
+}
+
 func FetchModels(c *gin.Context) {
 	var req struct {
 		BaseURL string `json:"base_url"`
@@ -973,6 +1019,15 @@ func FetchModels(c *gin.Context) {
 	baseURL := req.BaseURL
 	if baseURL == "" {
 		baseURL = constant.ChannelBaseURLs[req.Type]
+	}
+
+	// SSRF 防护：校验 BaseURL 是否安全
+	if err := validateBaseURL(baseURL); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": fmt.Sprintf("Invalid base URL: %s", err.Error()),
+		})
+		return
 	}
 
 	client := &http.Client{}

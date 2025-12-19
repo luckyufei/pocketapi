@@ -100,6 +100,12 @@ func sendBarkNotify(barkURL string, data dto.Notify) error {
 	finalURL := strings.ReplaceAll(barkURL, "{{title}}", url.QueryEscape(data.Title))
 	finalURL = strings.ReplaceAll(finalURL, "{{content}}", url.QueryEscape(content))
 
+	// SSRF防护：在发送请求前统一校验 URL
+	fetchSetting := system_setting.GetFetchSetting()
+	if err := common.ValidateURLWithFetchSetting(finalURL, fetchSetting.EnableSSRFProtection, fetchSetting.AllowPrivateIp, fetchSetting.DomainFilterMode, fetchSetting.IpFilterMode, fetchSetting.DomainList, fetchSetting.IpList, fetchSetting.AllowedPorts, fetchSetting.ApplyIPFilterForDomain); err != nil {
+		return fmt.Errorf("request reject: %v", err)
+	}
+
 	// 发送GET请求到Bark
 	var req *http.Request
 	var resp *http.Response
@@ -127,12 +133,6 @@ func sendBarkNotify(barkURL string, data dto.Notify) error {
 			return fmt.Errorf("bark request failed with status code: %d", resp.StatusCode)
 		}
 	} else {
-		// SSRF防护：验证Bark URL（非Worker模式）
-		fetchSetting := system_setting.GetFetchSetting()
-		if err := common.ValidateURLWithFetchSetting(finalURL, fetchSetting.EnableSSRFProtection, fetchSetting.AllowPrivateIp, fetchSetting.DomainFilterMode, fetchSetting.IpFilterMode, fetchSetting.DomainList, fetchSetting.IpList, fetchSetting.AllowedPorts, fetchSetting.ApplyIPFilterForDomain); err != nil {
-			return fmt.Errorf("request reject: %v", err)
-		}
-
 		// 直接发送请求
 		req, err = http.NewRequest(http.MethodGet, finalURL, nil)
 		if err != nil {
@@ -169,6 +169,12 @@ func sendGotifyNotify(gotifyUrl string, gotifyToken string, priority int, data d
 	// 构建完整的 Gotify API URL
 	// 确保 URL 以 /message 结尾
 	finalURL := strings.TrimSuffix(gotifyUrl, "/") + "/message?token=" + url.QueryEscape(gotifyToken)
+
+	// SSRF防护：在发送请求前统一校验 URL
+	fetchSetting := system_setting.GetFetchSetting()
+	if err := common.ValidateURLWithFetchSetting(finalURL, fetchSetting.EnableSSRFProtection, fetchSetting.AllowPrivateIp, fetchSetting.DomainFilterMode, fetchSetting.IpFilterMode, fetchSetting.DomainList, fetchSetting.IpList, fetchSetting.AllowedPorts, fetchSetting.ApplyIPFilterForDomain); err != nil {
+		return fmt.Errorf("request reject: %v", err)
+	}
 
 	// Gotify优先级范围0-10，如果超出范围则使用默认值5
 	if priority < 0 || priority > 10 {
@@ -221,12 +227,6 @@ func sendGotifyNotify(gotifyUrl string, gotifyToken string, priority int, data d
 			return fmt.Errorf("gotify request failed with status code: %d", resp.StatusCode)
 		}
 	} else {
-		// SSRF防护：验证Gotify URL（非Worker模式）
-		fetchSetting := system_setting.GetFetchSetting()
-		if err := common.ValidateURLWithFetchSetting(finalURL, fetchSetting.EnableSSRFProtection, fetchSetting.AllowPrivateIp, fetchSetting.DomainFilterMode, fetchSetting.IpFilterMode, fetchSetting.DomainList, fetchSetting.IpList, fetchSetting.AllowedPorts, fetchSetting.ApplyIPFilterForDomain); err != nil {
-			return fmt.Errorf("request reject: %v", err)
-		}
-
 		// 直接发送请求
 		req, err = http.NewRequest(http.MethodPost, finalURL, bytes.NewBuffer(payloadBytes))
 		if err != nil {
